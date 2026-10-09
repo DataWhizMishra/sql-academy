@@ -11,6 +11,29 @@ interface SqlEditorProps {
 
 export function SqlEditor({ value, onChange, onRunShortcut, height = '280px' }: SqlEditorProps) {
   const handleMount: OnMount = (editor, monaco) => {
+    // Custom theme tuned to the app palette: Midnight Blue surface, Electric
+    // Cyan keywords, Scrabble gold strings.
+    monaco.editor.defineTheme('scrabble-academy', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'keyword.sql', foreground: '00F0FF', fontStyle: 'bold' },
+        { token: 'operator.sql', foreground: '00F0FF' },
+        { token: 'string.sql', foreground: 'E6B981' },
+        { token: 'number.sql', foreground: 'B28DFF' },
+        { token: 'comment', foreground: 'A0A4B8', fontStyle: 'italic' },
+      ],
+      colors: {
+        'editor.background': '#1E212B',
+        'editor.foreground': '#FFFFFF',
+        'editorLineNumber.foreground': '#A0A4B8',
+        'editorCursor.foreground': '#00F0FF',
+        'editor.selectionBackground': '#00F0FF26',
+        'editor.lineHighlightBackground': '#262A36',
+      },
+    });
+    monaco.editor.setTheme('scrabble-academy');
+
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onRunShortcut?.();
     });
@@ -25,7 +48,7 @@ export function SqlEditor({ value, onChange, onRunShortcut, height = '280px' }: 
       <Editor
         height={height}
         defaultLanguage="sql"
-        theme="vs-dark"
+        theme="scrabble-academy"
         value={value}
         onChange={(v) => onChange(v ?? '')}
         onMount={handleMount}

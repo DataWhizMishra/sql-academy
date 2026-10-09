@@ -26,6 +26,18 @@ export interface QueryError {
   error: string;
 }
 
+export interface CheckResult {
+  /** false = this challenge is exploratory (conceptual/DDL or too large to grade). */
+  checkable: boolean;
+  correct?: boolean;
+  /** Why it was wrong (shape/value/order mismatch), when known. */
+  reason?: string | null;
+  /** A Postgres error from the submitted query, if it failed to run. */
+  error?: string;
+  expectedRowCount?: number;
+  yourRowCount?: number;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`);
   if (!res.ok) {
@@ -63,5 +75,16 @@ export async function runQuery(query: string): Promise<QueryResult> {
   });
   const body = await res.json();
   if (!res.ok) throw new Error(body.error || 'Query failed.');
+  return body;
+}
+
+export async function checkAnswer(id: number, query: string): Promise<CheckResult> {
+  const res = await fetch(`${API_URL}/api/challenges/${id}/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || 'Check failed.');
   return body;
 }

@@ -46,7 +46,7 @@ export function FloatingTiles({ count = 8, animate = true }: { count?: number; a
       {tiles.map((tile, i) => (
         <mesh key={i} position={tile.position}>
           <boxGeometry args={[0.6, 0.6, 0.12]} />
-          <meshStandardMaterial color="#f8fafc" emissive="#22c55e" emissiveIntensity={0.08} />
+          <meshStandardMaterial color="#e6b981" emissive="#e6b981" emissiveIntensity={0.12} />
         </mesh>
       ))}
     </group>

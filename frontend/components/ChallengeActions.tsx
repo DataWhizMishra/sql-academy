@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getApproach, getHint, getSolution } from '@/lib/api';
-import { BookOpenIcon, ChevronDownIcon, EyeIcon, LightbulbIcon, PlayIcon } from './icons';
+import { BookOpenIcon, CheckBadgeIcon, ChevronDownIcon, EyeIcon, LightbulbIcon, PlayIcon } from './icons';
 
 type PanelKey = 'hint' | 'approach' | 'solution';
 
@@ -16,10 +16,14 @@ export function ChallengeActions({
   challengeId,
   onRun,
   running,
+  onCheck,
+  checking,
 }: {
   challengeId: number;
   onRun: () => void;
   running: boolean;
+  onCheck: () => void;
+  checking: boolean;
 }) {
   const [panels, setPanels] = useState<RevealPanelState>({ hint: null, approach: null, solution: null });
   const [open, setOpen] = useState<PanelKey | null>(null);
@@ -60,11 +64,21 @@ export function ChallengeActions({
         <button
           type="button"
           onClick={onRun}
-          disabled={running}
-          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+          disabled={running || checking}
+          className="inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-background transition-all hover:bg-accent/90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
         >
           <PlayIcon className="h-4 w-4" />
           {running ? 'Running...' : 'Run Query'}
+        </button>
+
+        <button
+          type="button"
+          onClick={onCheck}
+          disabled={running || checking}
+          className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-accent to-success px-4 py-2.5 text-sm font-semibold text-background shadow-sm transition-all hover:shadow-[0_0_18px_rgba(0,240,255,0.45)] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+        >
+          <CheckBadgeIcon className="h-4 w-4" />
+          {checking ? 'Checking...' : 'Check Answer'}
         </button>
 
         <ActionToggle
@@ -87,6 +101,7 @@ export function ChallengeActions({
           active={open === 'solution'}
           loading={loading === 'solution'}
           onClick={() => toggle('solution')}
+          tone="magenta"
         />
       </div>
 
@@ -115,22 +130,23 @@ function ActionToggle({
   active,
   loading,
   onClick,
+  tone = 'accent',
 }: {
   icon: React.ReactNode;
   label: string;
   active: boolean;
   loading: boolean;
   onClick: () => void;
+  tone?: 'accent' | 'magenta';
 }) {
+  const activeTone = tone === 'magenta' ? 'border-magenta bg-magenta/10 text-magenta' : 'border-accent bg-accent/10 text-accent';
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer min-h-[44px] ${
-        active
-          ? 'border-accent bg-accent/10 text-accent'
-          : 'border-border bg-primary text-foreground/80 hover:bg-muted'
+      className={`inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition-all active:scale-95 cursor-pointer min-h-[44px] ${
+        active ? activeTone : 'border-border bg-primary text-foreground/80 hover:bg-muted'
       }`}
     >
       {icon}
@@ -141,7 +157,7 @@ function ActionToggle({
 }
 
 function Panel({ tone, title, children }: { tone: PanelKey; title: string; children: React.ReactNode }) {
-  const borderColor = tone === 'solution' ? 'border-accent/40' : 'border-border';
+  const borderColor = tone === 'solution' ? 'border-magenta/40' : 'border-border';
   return (
     <div className={`rounded-md border ${borderColor} bg-primary/60 p-4 text-sm text-foreground/90 leading-relaxed`}>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/50">{title}</p>

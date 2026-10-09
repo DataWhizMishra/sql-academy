@@ -18,8 +18,8 @@ export function DatabaseCylinder({ spinning = true }: { spinning?: boolean }) {
       <mesh ref={ref}>
         <cylinderGeometry args={[1, 1, 2.4, 32, 1, true]} />
         <meshStandardMaterial
-          color="#1e293b"
-          emissive="#22c55e"
+          color="#1e212b"
+          emissive="#00f0ff"
           emissiveIntensity={0.35}
           metalness={0.6}
           roughness={0.3}
@@ -32,7 +32,7 @@ export function DatabaseCylinder({ spinning = true }: { spinning?: boolean }) {
       {[-1.1, -0.4, 0.3, 1.0].map((y) => (
         <mesh key={y} position={[0, y, 0]}>
           <torusGeometry args={[1, 0.04, 8, 32]} />
-          <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.8} />
+          <meshStandardMaterial color="#00f0ff" emissive="#00f0ff" emissiveIntensity={0.8} />
         </mesh>
       ))}
     </group>

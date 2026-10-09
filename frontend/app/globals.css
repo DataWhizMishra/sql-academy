@@ -10,12 +10,12 @@
 
 html,
 body {
-  background-color: #0f172a;
-  color: #f8fafc;
+  background-color: #12141c;
+  color: #ffffff;
 }
 
 * {
-  scrollbar-color: #475569 #0f172a;
+  scrollbar-color: #2e3340 #12141c;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -30,5 +30,28 @@ body {
 }
 
 .glow-text {
-  text-shadow: 0 0 10px rgba(34, 197, 94, 0.45);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+/* Electric cyan → muted purple → neon magenta heading gradient. */
+.gradient-text {
+  background: linear-gradient(100deg, #00f0ff 0%, #b28dff 50%, #ff007f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* When motion is reduced, feedback still appears — it just doesn't move.
+   Neutralise the attention-seeking transforms but keep opacity/colour. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .animate-pop-in,
+  .animate-slide-up-fade,
+  .animate-check-ring,
+  .animate-glow-pulse {
+    animation: none !important;
+  }
+  .confetti-piece {
+    display: none !important;
+  }
 }

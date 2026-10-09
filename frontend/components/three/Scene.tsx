@@ -15,8 +15,8 @@ export function Scene() {
     <div className="fixed inset-0 -z-10 pointer-events-none" aria-hidden="true">
       <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={[1, 1.5]}>
         <ambientLight intensity={0.4} />
-        <pointLight position={[5, 5, 5]} intensity={1.2} color="#22c55e" />
-        <pointLight position={[-5, -3, 2]} intensity={0.5} color="#1e293b" />
+        <pointLight position={[5, 5, 5]} intensity={1.2} color="#00f0ff" />
+        <pointLight position={[-5, -3, 2]} intensity={0.6} color="#ff007f" />
         <DatabaseCylinder spinning={!reducedMotion} />
         <FloatingTiles animate={!reducedMotion} />
       </Canvas>
