@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// On Vercel the frontend and backend deploy as two services behind one domain,
+// so the browser calls the backend same-origin at /api/* — no base URL needed.
+// NEXT_PUBLIC_API_URL still overrides it (e.g. pointing at a separately hosted
+// API), and local split-server dev falls back to the Express port on :4000.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:4000' : '');
 
 export type Tier = 'beginner' | 'intermediate' | 'advanced';
 

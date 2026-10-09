@@ -1,64 +1,79 @@
-# Deploying to Vercel
+# Deploying to Vercel (Services)
 
-This repo is a monorepo with two apps:
+This repo deploys as a **single Vercel project with two [services](https://vercel.com/docs/services)**:
 
-- `frontend/` — Next.js (the UI)
-- `backend/` — Express API (`/api/*`, read-only SQL execution against Postgres)
+- `frontend` — Next.js, public at `/`
+- `backend` — Express API, public at `/api/*`
 
-> **Why there is no root `vercel.json` with a `services` block.**
-> Vercel has no `services` key — a Vercel **project builds exactly one
-> framework**, and a monorepo is deployed as **multiple projects**, each pointed
-> at a subdirectory (its "Root Directory"). Cross-service routing is done with
-> each project's own `vercel.json`, env vars, and domains — not a single root
-> config. So the suggested `{ "services": { ... } }` file won't validate or
-> deploy; the setup below is the working equivalent.
+Both build independently and share one domain, so the browser calls the API
+same-origin at `/api/...` — no cross-origin base URL and no CORS needed in
+production. Routing lives in the root [`vercel.json`](./vercel.json):
 
-## Create two Vercel projects from this one repo
+```json
+{
+  "services": {
+    "frontend": { "root": "frontend", "framework": "nextjs" },
+    "backend":  { "root": "backend",  "framework": "express", "entrypoint": "app.js" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)",     "destination": { "service": "frontend" } }
+  ]
+}
+```
 
-In the Vercel dashboard, **Add New → Project**, import this GitHub repo **twice**:
+A service receives the **original request path**, so `/api/challenges` reaches
+the backend as `/api/challenges` — matching the routes Express mounts under
+`/api/*` in `backend/app.js`.
 
-### 1. Backend project
-- **Root Directory:** `backend`
-- Framework preset: **Other** (Vercel auto-detects the serverless function in
-  `backend/api/`; `backend/vercel.json` rewrites every path into the Express app)
-- **Environment variables:**
-  - `READONLY_DATABASE_URL` — the read-only Postgres connection string
-    (prefer a **pooled** endpoint: Neon / Supabase pooler / PgBouncer, since
-    serverless opens many short-lived connections)
-  - `CORS_ORIGIN` — the frontend's deployed URL, e.g. `https://<frontend>.vercel.app`
-  - `DB_POOL_MAX` — optional; defaults to `5` per instance
-- After it deploys, note its URL, e.g. `https://<backend>.vercel.app`
+## Setup
 
-### 2. Frontend project
-- **Root Directory:** `frontend`
-- Framework preset: **Next.js** (auto-detected)
-- **Environment variable:**
-  - `NEXT_PUBLIC_API_URL` — the backend project URL from above
-    (`https://<backend>.vercel.app`, no trailing slash). The frontend calls
-    `${NEXT_PUBLIC_API_URL}/api/...`.
+1. Import this repo as one Vercel project and enable **Services** (a project
+   builds as services when the `services` key is present in `vercel.json`).
+2. Set environment variables on the project:
+   - `READONLY_DATABASE_URL` — read-only Postgres connection string. Prefer a
+     **pooled** endpoint (Neon / Supabase pooler / PgBouncer); serverless opens
+     many short-lived connections.
+   - `DB_POOL_MAX` — optional; per-instance pool size (default `5`).
+   - `CORS_ORIGIN` / `NEXT_PUBLIC_API_URL` are **not needed** in services mode
+     (same origin). Only set `NEXT_PUBLIC_API_URL` if you point the frontend at
+     a separately hosted API instead.
+3. Deploy. Everything is served from the one project domain.
 
-Set `CORS_ORIGIN` (backend) and `NEXT_PUBLIC_API_URL` (frontend) to point at each
-other, then redeploy both so the values take effect.
+## Service-to-service calls (bindings) — not used here
 
-## Database
+Vercel [bindings](https://vercel.com/docs/services/bindings) let one service
+call another privately, server-side, via an injected URL. **This repo adds no
+bindings**: the only frontend→backend traffic is the *browser* fetching
+`/api/*`, which goes through the public top-level rewrite — not a binding.
+Bindings resolve in server-side functions only (never in the browser, builds,
+or middleware), so one would do nothing here. If you later add **server-side**
+Next.js code that calls the backend directly, declare a binding on the
+`frontend` service and read the injected URL there.
 
-`DATABASE_URL` / the seed script (`npm run seed`, loads `english_words_479k.txt`)
-are for **one-time local setup only** and are not used at runtime — the API runs
-with the read-only role via `READONLY_DATABASE_URL`. Seed your hosted Postgres
-once (locally, pointed at the hosted DB, or via a migration job) before relying
-on the deployed API. Never commit real credentials; keep them in Vercel's env
-settings and in the local, gitignored `backend/.env`.
-
-## Local development (unchanged)
+## Local development
 
 ```bash
-# backend
-cd backend && npm install && npm run dev   # http://localhost:4000
+# Option A — mirror production with one command (binding vars injected):
+vercel dev
 
-# frontend
+# Option B — the two dev servers separately:
+cd backend  && npm install && npm run dev   # http://localhost:4000
 cd frontend && npm install && npm run dev   # http://localhost:3000
 ```
 
-`backend/server.js` is the local entrypoint (it calls `app.listen`);
-`backend/api/index.js` is the serverless entrypoint (it exports the same app
-without listening). Both share `backend/app.js`.
+With Option B the frontend defaults to `http://localhost:4000` for the API in
+development (override with `NEXT_PUBLIC_API_URL` in `frontend/.env.local`); the
+Express app allows the `http://localhost:3000` origin via `CORS_ORIGIN`.
+
+`backend/app.js` exports the Express app (the Vercel `entrypoint`);
+`backend/server.js` is the local entrypoint that calls `app.listen`.
+
+## Database
+
+`DATABASE_URL` and the seed script (`npm run seed`, loads
+`english_words_479k.txt`) are for one-time setup only and are not used at
+runtime — the API runs read-only via `READONLY_DATABASE_URL`. Seed your hosted
+Postgres once before relying on the deployed API. Never commit real
+credentials; keep them in Vercel's env settings and the gitignored
+`backend/.env`.
