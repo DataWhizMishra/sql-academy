@@ -1,0 +1,148 @@
+// Full curriculum content. Hints/approach/solution text are plain strings so
+// the frontend can render them verbatim; `solution` is never sent to the
+// client until the student explicitly requests it (see routes/challenges.js).
+
+const CHALLENGES = [
+  {
+    id: 1,
+    tier: 'beginner',
+    title: 'Letter of the Alphabet',
+    topics: ['SUBSTRING', 'GROUP BY', 'COUNT'],
+    prompt: "How many words in the dictionary start with each letter of the alphabet? Produce one row per starting letter with a word count.",
+    starterQuery: 'SELECT *\nFROM dictionary\nLIMIT 10;',
+    hint: 'LEFT(word, 1) or SUBSTRING(word, 1, 1) pulls out just the first character — then it is an ordinary GROUP BY.',
+    approach: "Extract the first character of every word with LEFT() (or SUBSTRING), GROUP BY that single character, and COUNT(*) within each group. Order by the letter so the distribution reads A→Z.",
+    solution: "SELECT LEFT(word, 1) AS starting_letter,\n       COUNT(*) AS word_count\nFROM dictionary\nGROUP BY starting_letter\nORDER BY starting_letter;",
+  },
+  {
+    id: 2,
+    tier: 'beginner',
+    title: 'Word Length Distribution',
+    topics: ['LENGTH', 'GROUP BY'],
+    prompt: 'How many 1-letter words are there? 2-letter? 3-letter? Build the full word-length histogram.',
+    starterQuery: 'SELECT word, LENGTH(word)\nFROM dictionary\nLIMIT 10;',
+    hint: 'LENGTH(word) gives you a number to group by, just like the first letter did in Challenge 1.',
+    approach: 'Compute LENGTH(word) per row, GROUP BY that length, and COUNT(*) per group. Sort by length ascending so the histogram is readable.',
+    solution: "SELECT LENGTH(word) AS word_length,\n       COUNT(*) AS word_count\nFROM dictionary\nGROUP BY word_length\nORDER BY word_length;",
+  },
+  {
+    id: 3,
+    tier: 'beginner',
+    title: 'Average & Median Length',
+    topics: ['AVG', 'PERCENTILE_CONT'],
+    prompt: 'What is the average word length in the dictionary? What is the median? (They are not the same number — find out why.)',
+    starterQuery: 'SELECT AVG(LENGTH(word))\nFROM dictionary;',
+    hint: 'AVG() handles the mean in one line. The median needs PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ...).',
+    approach: 'AVG(LENGTH(word)) gives the mean directly. For the median, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY LENGTH(word)) interpolates the middle value of the sorted length distribution — this is why it needs an ORDER BY inside the function call instead of a GROUP BY.',
+    solution: "SELECT AVG(LENGTH(word)) AS avg_length,\n       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY LENGTH(word)) AS median_length\nFROM dictionary;",
+  },
+  {
+    id: 4,
+    tier: 'beginner',
+    title: 'Neighbors of Kayak',
+    topics: ['LEAD', 'LAG', 'Window Functions'],
+    prompt: "Alphabetically, what word comes right after 'kayak'? What word is 10 positions after it? What word is two positions before it?",
+    starterQuery: "SELECT word\nFROM dictionary\nORDER BY word\nLIMIT 10;",
+    hint: 'LEAD(word, n) and LAG(word, n) OVER (ORDER BY word) look n rows forward/backward from the current row — without a self-join.',
+    approach: "Window functions let you peek at neighboring rows in a sorted sequence without a self-join. ORDER BY word establishes alphabetical order; LEAD(word, 1) OVER (ORDER BY word) is the very next word, LEAD(word, 10) is ten words later, and LAG(word, 2) is two words earlier. Compute them all, then filter WHERE word = 'kayak'.",
+    solution: "SELECT word,\n       LAG(word, 2)  OVER (ORDER BY word) AS two_words_before,\n       LEAD(word, 1) OVER (ORDER BY word) AS next_word,\n       LEAD(word, 10) OVER (ORDER BY word) AS ten_words_after\nFROM dictionary\nWHERE word = 'kayak';",
+  },
+  {
+    id: 5,
+    tier: 'intermediate',
+    title: 'Palindrome Finder',
+    topics: ['REVERSE', 'String Comparison'],
+    prompt: 'Find every word in the dictionary that reads the same forwards and backwards.',
+    starterQuery: "SELECT word, REVERSE(word)\nFROM dictionary\nLIMIT 10;",
+    hint: 'A palindrome is just a word that equals its own REVERSE(). No GROUP BY needed here.',
+    approach: "REVERSE(word) flips the string. A palindrome satisfies word = REVERSE(word). Exclude single-letter words with LENGTH(word) > 1 since every one-letter word trivially equals its own reverse and isn't an interesting palindrome.",
+    solution: "SELECT word\nFROM dictionary\nWHERE word = REVERSE(word)\n  AND LENGTH(word) > 1\nORDER BY word;",
+  },
+  {
+    id: 6,
+    tier: 'intermediate',
+    title: 'Anagram Groups',
+    topics: ['String Splitting', 'STRING_AGG', 'CTEs'],
+    prompt: 'Group every word in the dictionary with its anagrams — words that use exactly the same letters in a different order.',
+    starterQuery: "SELECT word\nFROM dictionary\nLIMIT 10;",
+    hint: 'Two words are anagrams if their letters, sorted alphabetically, produce the identical string. That sorted string is your grouping key.',
+    approach: "Split each word into characters with regexp_split_to_array / unnest, re-sort those characters alphabetically, and glue them back together with string_agg(... ORDER BY ch) to produce a canonical 'signature' per word. Words sharing a signature are anagrams of each other. GROUP BY that signature and keep only groups with COUNT(*) > 1.",
+    solution: "WITH signatures AS (\n  SELECT word,\n         (SELECT string_agg(ch, '' ORDER BY ch)\n          FROM unnest(regexp_split_to_array(word, '')) AS ch) AS sorted_letters\n  FROM dictionary\n)\nSELECT sorted_letters,\n       STRING_AGG(word, ', ' ORDER BY word) AS anagrams,\n       COUNT(*) AS group_size\nFROM signatures\nGROUP BY sorted_letters\nHAVING COUNT(*) > 1\nORDER BY group_size DESC;",
+  },
+  {
+    id: 7,
+    tier: 'intermediate',
+    title: 'Unlimited Scrabble',
+    topics: ['Cross Joins', 'Subset Logic'],
+    prompt: 'If you could pick any 7 letters and have an unlimited supply of each, which 7 letters let you spell the most 1-to-7-letter dictionary words?',
+    starterQuery: "SELECT word\nFROM dictionary\nWHERE LENGTH(word) <= 7\nLIMIT 10;",
+    hint: "A word is spellable from a letter set if every distinct letter in the word is a MEMBER of that set — array containment (<@) is exactly this check.",
+    approach: "First reduce every word to its distinct letters (ARRAY_AGG(DISTINCT letter)). A candidate 7-letter set S can spell a word when the word's distinct-letter array is a subset of S — in Postgres, word_letters <@ ARRAY[S]. The hard part is finding the OPTIMAL S: there are C(26,7) ≈ 657,800 possible sets, too many to brute-force per-word in plain SQL. The practical approach is to verify specific high-frequency candidate sets (common choices include vowel-heavy sets like {a,e,i,n,r,s,t}) and compare their counts — a true exhaustive search is better done by generating candidate sets programmatically (e.g. a recursive CTE enumerating combinations, or an application-layer loop) and reusing this same counting query inside it.",
+    solution: "-- Verifying one candidate set, e.g. {a,e,i,n,r,s,t}:\nWITH word_letters AS (\n  SELECT word, ARRAY_AGG(DISTINCT letter) AS letters\n  FROM dictionary, unnest(regexp_split_to_array(lower(word), '')) AS letter\n  WHERE LENGTH(word) BETWEEN 1 AND 7\n  GROUP BY word\n)\nSELECT COUNT(*) AS spellable_words\nFROM word_letters\nWHERE letters <@ ARRAY['a','e','i','n','r','s','t'];",
+  },
+  {
+    id: 8,
+    tier: 'intermediate',
+    title: 'Subset Matching',
+    topics: ['Character Counting', 'Array Comparison'],
+    prompt: "Given the letters 'afirs', prove whether you have the right letters (and enough of each) to spell 'fair'.",
+    starterQuery: "SELECT lower(unnest(regexp_split_to_array('fair', '')));",
+    hint: "This isn't just 'does fair use only letters in afirs' — it's a multiset problem: count how many of EACH letter the word needs vs. how many you have available.",
+    approach: "Split the target word into its letters and COUNT(*) per letter to get 'needed' quantities. Do the same for the available letter pool to get 'have' quantities. The word is spellable only if, for every letter the word needs, have >= needed — checked with a NOT EXISTS over any shortfall.",
+    solution: "WITH needed AS (\n  SELECT letter, COUNT(*) AS qty\n  FROM unnest(regexp_split_to_array(lower('fair'), '')) AS letter\n  GROUP BY letter\n),\navailable AS (\n  SELECT letter, COUNT(*) AS qty\n  FROM unnest(regexp_split_to_array(lower('afirs'), '')) AS letter\n  GROUP BY letter\n)\nSELECT NOT EXISTS (\n  SELECT 1 FROM needed n\n  LEFT JOIN available a ON a.letter = n.letter\n  WHERE COALESCE(a.qty, 0) < n.qty\n) AS can_spell_fair;",
+  },
+  {
+    id: 9,
+    tier: 'advanced',
+    title: 'Realistic Scrabble Bag',
+    topics: ['Joins with Reference Tables', 'Advanced Filtering'],
+    prompt: 'Repeat the subset-matching idea from Challenge 8, but this time respect the EXACT tile counts of a standard Scrabble bag (see scrabble_tiles), and allow 8-letter words for the first-turn case.',
+    starterQuery: "SELECT * FROM scrabble_tiles ORDER BY letter;",
+    hint: "Join each word's per-letter letter-count against scrabble_tiles.bag_count, then require that EVERY letter in the word satisfies needed <= bag_count. bool_and() over the joined rows checks 'every', not just 'any'.",
+    approach: "For each word, compute how many of each letter it needs (group by word + letter). Join that to scrabble_tiles on letter to attach bag_count. Group again by word and use bool_and(needed <= bag_count) — this aggregate is only TRUE if the condition holds for every letter the word uses, which is exactly the bag-feasibility check.",
+    solution: "WITH word_letter_counts AS (\n  SELECT d.id, d.word, letter, COUNT(*) AS needed\n  FROM dictionary d,\n       unnest(regexp_split_to_array(lower(d.word), '')) AS letter\n  WHERE LENGTH(d.word) BETWEEN 1 AND 8\n  GROUP BY d.id, d.word, letter\n)\nSELECT wlc.word\nFROM word_letter_counts wlc\nJOIN scrabble_tiles st ON st.letter = wlc.letter\nGROUP BY wlc.id, wlc.word\nHAVING bool_and(wlc.needed <= st.bag_count)\nORDER BY wlc.word;",
+  },
+  {
+    id: 10,
+    tier: 'advanced',
+    title: 'Maximum Scrabble Score',
+    topics: ['Complex JOINs', 'SUM', 'GROUP BY'],
+    prompt: 'Which 8-letter dictionary word scores the most points on a Scrabble board (ignoring bonus squares)? Which 7 tiles would you need in your rack to play it (assuming one letter is already on the board)?',
+    starterQuery: "SELECT letter, points FROM scrabble_tiles ORDER BY points DESC;",
+    hint: "Unnest each 8-letter word into its individual letters, JOIN to scrabble_tiles to attach a point value to each letter, then SUM per word.",
+    approach: "Filter dictionary to LENGTH(word) = 8, unnest each word into its component letters (duplicates matter here, so don't DISTINCT them), join to scrabble_tiles to get each letter's point value, and SUM(points) GROUP BY word. ORDER BY the total descending and take the top row. Once you have the winning word, the '7 tiles to hold' is simply that word's 8 letters minus whichever single letter is assumed already on the board.",
+    solution: "WITH word_scores AS (\n  SELECT d.word, SUM(st.points) AS total_score\n  FROM dictionary d,\n       unnest(regexp_split_to_array(lower(d.word), '')) AS letter\n  JOIN scrabble_tiles st ON st.letter = letter\n  WHERE LENGTH(d.word) = 8\n  GROUP BY d.word\n)\nSELECT word, total_score\nFROM word_scores\nORDER BY total_score DESC\nLIMIT 1;",
+  },
+  {
+    id: 11,
+    tier: 'advanced',
+    title: 'Board-Context Scrabble',
+    topics: ['Recursive CTEs', 'Relational Board Modeling'],
+    prompt: 'A 9-or-10-letter word is being considered for the board, but it must intersect — share a letter in the right position — with a word already placed above or below it. Model and query that constraint.',
+    starterQuery: "-- This challenge needs a board_state(row, col, letter) table in addition\n-- to dictionary; sketch your join logic here first.\nSELECT word FROM dictionary WHERE LENGTH(word) IN (9, 10) LIMIT 10;",
+    hint: "You need a board_state(row, col, letter) table to represent what's already placed. A candidate word is playable vertically at a column if, for the row where it would cross an existing word, its letter AT THAT POSITION matches board_state.letter.",
+    approach: "This extends the schema: add board_state(row INT, col INT, letter CHAR(1)). For a candidate word placed vertically starting at (row0, col), its character at position i lands at (row0 + i, col). Join candidate letters (via generate_series for position + SUBSTRING for the letter) against board_state on matching (row, col), and require the letters agree. A recursive CTE is useful if you want to walk the board and build up multi-word placements turn by turn rather than checking one placement at a time.",
+    solution: "-- Conceptual sketch (requires the board_state table described above):\nWITH candidate AS (\n  SELECT word, generate_series(0, LENGTH(word) - 1) AS offset\n  FROM dictionary\n  WHERE LENGTH(word) IN (9, 10)\n),\nplacement AS (\n  SELECT c.word, c.offset,\n         SUBSTRING(c.word FROM c.offset + 1 FOR 1) AS candidate_letter,\n         b.letter AS board_letter\n  FROM candidate c\n  LEFT JOIN board_state b\n    ON b.row = :start_row + c.offset AND b.col = :fixed_col\n)\nSELECT word\nFROM placement\nGROUP BY word\nHAVING bool_and(board_letter IS NULL OR board_letter = candidate_letter);",
+  },
+  {
+    id: 12,
+    tier: 'advanced',
+    title: 'Query Optimization',
+    topics: ['EXPLAIN ANALYZE', 'Indexing', 'Database Architecture'],
+    prompt: "Challenge 10's max-score query is slow at scale. Diagnose it with EXPLAIN ANALYZE and write the indexing strategy that fixes it. Note: this sandbox only runs SELECT statements, so EXPLAIN ANALYZE and CREATE INDEX need a direct psql/pgAdmin session against the same database — run the query below there first.",
+    starterQuery: "-- Run this one directly in psql (prefixed with EXPLAIN ANALYZE) — the\n-- in-browser sandbox is SELECT-only and can't execute EXPLAIN or DDL.\nSELECT d.word, SUM(st.points) AS total_score\nFROM dictionary d,\n     unnest(regexp_split_to_array(lower(d.word), '')) AS letter\nJOIN scrabble_tiles st ON st.letter = letter\nWHERE LENGTH(d.word) = 8\nGROUP BY d.word\nORDER BY total_score DESC\nLIMIT 1;",
+    hint: "LENGTH(d.word) = 8 can't use a plain B-tree index on `word` — Postgres has to compute LENGTH() for every row. Either index the expression directly, or materialize it as a stored generated column.",
+    approach: "EXPLAIN ANALYZE on the Challenge 10 query will show a Seq Scan over dictionary to evaluate LENGTH(word) = 8, since no index covers that expression. Two fixes, in order of effectiveness: (1) add a STORED generated column `word_length` computed from LENGTH(word) and put a plain B-tree (or partial) index on it — this is the most reusable fix since `word_length` becomes a normal indexable column; (2) if you can't alter the schema, create a functional index directly on the expression. Also confirm scrabble_tiles.letter is indexed (it already is, as the PRIMARY KEY) so the join itself stays an efficient index/hash lookup rather than a nested-loop seq scan.",
+    solution: "-- Option 1 (preferred): generated column + partial index\nALTER TABLE dictionary ADD COLUMN word_length INT GENERATED ALWAYS AS (LENGTH(word)) STORED;\nCREATE INDEX idx_dictionary_word_length_8 ON dictionary (word_length) WHERE word_length = 8;\n\n-- Option 2: functional index without altering the schema\nCREATE INDEX idx_dictionary_length_expr ON dictionary ((LENGTH(word)));\n\n-- Re-run EXPLAIN ANALYZE afterwards and confirm the Seq Scan became an Index Scan.",
+  },
+];
+
+function listChallenges() {
+  return CHALLENGES.map(({ id, tier, title, topics, prompt }) => ({ id, tier, title, topics, prompt }));
+}
+
+function getChallenge(id) {
+  return CHALLENGES.find((c) => c.id === Number(id));
+}
+
+module.exports = { CHALLENGES, listChallenges, getChallenge };
